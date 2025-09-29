@@ -1,20 +1,26 @@
 import Image from "next/image";
 import { supabase } from '@/lib/supabaseClient'
+import Link from 'next/link'
 
 export default async function Home() {
   const { data: repos, error } = await supabase
     .from('repositories')
-    .select('*')
+    .select('id, name, description')
     .eq('is_public', true)
   if (error) {
-    return <div>Error: {error.message}</div>
+    return <div className="p-4 text-red-600">Error: {error.message}</div>
   }
   return (
     <main className="p-6">
-      <h1 className="text-2xl font-bold">Public Repositories</h1>
-      <ul className="mt-4">
+      <h1 className="text-2xl font-bold mb-4">Public Repositories</h1>
+      <ul className="space-y-2">
         {repos?.map((r) => (
-          <li key={r.id} className="border-b py-2">{r.name}</li>
+          <li key={r.id} className="p-4 border rounded-md">
+            <Link href={`/repo/${r.id}`} className="text-blue-600 hover:underline">
+              {r.name}
+            </Link>
+            <p className="text-sm text-gray-500">{r.description}</p>
+          </li>
         ))}
       </ul>
     </main>
