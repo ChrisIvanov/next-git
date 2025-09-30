@@ -1,27 +1,70 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabaseClient"
 
 export default function Navigation() {
-  const pathname = usePathname()
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null)
 
-  const linkClass = (path: string) =>
-    `px-3 py-2 rounded hover:bg-blue-600 hover:text-white ${
-      pathname === path ? "bg-blue-700 text-white" : "text-gray-800"
-    }`
+  useEffect(() => {
+    async function loadUser() {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    loadUser()
+
+    // слушане за промени в сесията (login/logout)
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => {
+      authListener.subscription.unsubscribe()
+    }
+  }, [])
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    setUser(null)
+    router.push("/")
+  }
 
   return (
-    <nav className="bg-gray-100 px-4 py-2 flex gap-4">
-      <Link href="/" className={linkClass("/")}>
-        Home
-      </Link>
-      <Link href="/repo/create" className={linkClass("/repo/create")}>
-        New Repo
-      </Link>
-      <Link href="/login" className={linkClass("/login")}>
-        Login
-      </Link>
+    <nav className="flex items-center justify-between bg-gray-100 px-6 py-3 shadow">
+      {/* Лява част - линкове */}
+      <div className="flex space-x-4">
+        <Link href="/" className="text-blue-600 font-medium hover:underline">
+          Home
+        </Link>
+
+        {user && (
+          <Link href="/repo/create" className="text-blue-600 font-medium hover:underline">
+            New Repo
+          </Link>
+        )}
+      </div>
+
+      {/* Дясна част - login/logout */}
+      <div>
+        {user ? (
+          <button
+            onClick={handleLogout}
+            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+          >
+            Logout
+          </button>
+        ) : (
+          <Link
+            href="/login"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Login
+          </Link>
+        )}
+      </div>
     </nav>
   )
 }

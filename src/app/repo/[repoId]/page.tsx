@@ -20,6 +20,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export default function RepoPage({ params }: Props) {
-  return <RepoClient repoId={params.repoId} />
+export default async function RepoPage({ params }: Props) {
+  return <RepoClient repoId={await params.repoId} />
 }

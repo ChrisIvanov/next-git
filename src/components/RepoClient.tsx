@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import { Repo, Commit } from "@/types/supabase"
+import Link from "next/link"
 
 export default function RepoClient({ repoId }: { repoId: string }) {
   const router = useRouter()
@@ -98,11 +99,13 @@ export default function RepoClient({ repoId }: { repoId: string }) {
       <h2 className="text-xl font-bold mb-2">Commit history</h2>
       <ul className="space-y-2">
         {commits.map((c) => (
-          <li key={c.id} className="border p-3 rounded">
-            <p className="font-medium">{c.message}</p>
-            <p className="text-sm text-gray-500">
-              {new Date(c.created_at).toLocaleString()}
-            </p>
+          <li key={c.id} className="border p-3 rounded hover:bg-gray-50">
+            <Link href={`/repo/${repoId}/commit/${c.id}`} className="block">
+              <p className="font-medium text-blue-600 hover:underline">{c.message}</p>
+              <p className="text-sm text-gray-500">
+                {new Date(c.created_at).toLocaleString()}
+              </p>
+            </Link>
           </li>
         ))}
       </ul>

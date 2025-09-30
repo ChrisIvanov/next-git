@@ -18,68 +18,94 @@ export default function CommitDetailsPage() {
   const [content, setContent] = useState("")
   const [error, setError] = useState<string | null>(null)
 
-  // зареждане на commit + files
-  useEffect(() => {
-    async function loadData() {
-      const { data: commitData } = await supabase
-        .from("commits")
-        .select("id, repo_id, message, created_at, author_id")
-        .eq("id", commitId)
-        .single()
-
-      setCommit(commitData)
-
-      const { data: filesData } = await supabase
-        .from("files")
-        .select("id, filename, author_id, commit_id, content, created_at")
-        .eq("commit_id", commitId)
-        .order("created_at", { ascending: true })
-
-      setFiles(filesData || [])
-    }
-    if (commitId) loadData()
-  }, [commitId])
-
-  // добавяне на файл
-  async function handleAddFile(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-
-    if (!filename.trim() || !content.trim()) {
-      setError("Filename and content are required")
-      return
-    }
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push("/login")
-      return
-    }
-
-    const { error } = await supabase.from("files").insert([
-      {
-        commit_id: commitId,
-        filename,
-        content,
-      },
-    ])
-
-    if (error) {
-      setError(error.message)
-    } else {
-      setFilename("")
-      setContent("")
-
-      // презареждане на файловете
-      const { data: filesData } = await supabase
-        .from("files")
-        .select("id, filename, author_id, commit_id, content, created_at")
-        .eq("commit_id", commitId)
-        .order("created_at", { ascending: true })
-
-      setFiles(filesData || [])
-    }
+  
+  async function loadFiles() {
+    console.log("commitId used in query:", commitId)
+  const { data: filesData } = await supabase
+    .from("files")
+    .select("*")
+    .eq("commit_id", commitId)
+    .order("created_at", { ascending: true })
+ console.log("filesData:", filesData, "error:", error)
+    setFiles(filesData || [])
   }
+
+  useEffect(() => {
+  if (!commitId) return
+
+  async function loadData() {
+    
+    const { data: commitData } = await supabase
+      .from("commits")
+      .select("id, repo_id, message, created_at, author_id")
+      .eq("id", commitId)
+      .single()
+
+    setCommit(commitData)
+    await loadFiles()
+  }
+
+  loadData()
+
+  // realtime
+  const channel = supabase
+    .channel("files-realtime")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "files", filter: `commit_id=eq.${commitId}` },
+      (payload) => {
+        if (payload.eventType === "INSERT") {
+          setFiles((prev) => [...prev, payload.new as File])
+        }
+        if (payload.eventType === "DELETE") {
+          setFiles((prev) => prev.filter((f) => f.id !== (payload.old as File).id))
+        }
+        if (payload.eventType === "UPDATE") {
+          setFiles((prev) =>
+            prev.map((f) => (f.id === (payload.new as File).id ? (payload.new as File) : f))
+          )
+        }
+      }
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}, [commitId])
+
+// добавяне на файл
+async function handleAddFile(e: React.FormEvent) {
+  e.preventDefault()
+  setError(null)
+
+  if (!filename.trim() || !content.trim()) {
+    setError("Filename and content are required")
+    return
+  }
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    router.push("/login")
+    return
+  }
+
+  const { error } = await supabase.from("files").insert([
+    {
+      commit_id: commitId,
+      filename,
+      content,
+    },
+  ])
+
+  if (error) {
+    setError(error.message)
+  } else {
+    setFilename("")
+    setContent("")
+    //await loadFiles()
+  }
+}
 
   if (!commit) return <p className="p-4">Loading commit...</p>
 
@@ -131,7 +157,7 @@ export default function CommitDetailsPage() {
         {files.map((f) => (
           <li key={f.id} className="border p-3 rounded">
             <p className="font-medium">{f.filename}</p>
-            <pre className="bg-gray-100 p-2 rounded overflow-x-auto text-sm">
+            <pre className="text-gray-900 bg-gray-100 p-2 rounded overflow-x-auto text-sm font-mono">
               {f.content}
             </pre>
             <p className="text-xs text-gray-500">
@@ -140,6 +166,8 @@ export default function CommitDetailsPage() {
           </li>
         ))}
       </ul>
+      {files.length === 0 && (
+      <p className="text-gray-500 mt-2">No files found for this commit</p>)}
       {/* секция за коментари */}
       <Comments repoId={repoId} commitId={commitId} />
     </div>
