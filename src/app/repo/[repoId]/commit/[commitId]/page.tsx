@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import Comments from "@/components/Comments"
+import { Commit, File } from "@/types/supabase"
 
 export default function CommitDetailsPage() {
   const params = useParams()
@@ -11,8 +12,8 @@ export default function CommitDetailsPage() {
   const repoId = params?.repoId as string
   const commitId = params?.commitId as string
 
-  const [commit, setCommit] = useState<any>(null)
-  const [files, setFiles] = useState<any[]>([])
+  const [commit, setCommit] = useState<Commit | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [filename, setFilename] = useState("")
   const [content, setContent] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -22,7 +23,7 @@ export default function CommitDetailsPage() {
     async function loadData() {
       const { data: commitData } = await supabase
         .from("commits")
-        .select("id, message, created_at, author_id")
+        .select("id, repo_id, message, created_at, author_id")
         .eq("id", commitId)
         .single()
 
@@ -30,7 +31,7 @@ export default function CommitDetailsPage() {
 
       const { data: filesData } = await supabase
         .from("files")
-        .select("id, filename, content, created_at")
+        .select("id, filename, author_id, commit_id, content, created_at")
         .eq("commit_id", commitId)
         .order("created_at", { ascending: true })
 
@@ -72,7 +73,7 @@ export default function CommitDetailsPage() {
       // презареждане на файловете
       const { data: filesData } = await supabase
         .from("files")
-        .select("id, filename, content, created_at")
+        .select("id, filename, author_id, commit_id, content, created_at")
         .eq("commit_id", commitId)
         .order("created_at", { ascending: true })
 

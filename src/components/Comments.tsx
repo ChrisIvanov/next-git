@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useRouter } from "next/navigation"
+import { Comment } from "@/types/supabase"
 
 interface CommentsProps {
   repoId: string
@@ -11,16 +12,16 @@ interface CommentsProps {
 
 export default function Comments({ repoId, commitId }: CommentsProps) {
   const router = useRouter()
-  const [comments, setComments] = useState<any[]>([])
   const [content, setContent] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [comments, setComments] = useState<Comment[]>([])
 
   // зареждане на коментари
   useEffect(() => {
     async function loadComments() {
       let query = supabase
         .from("comments")
-        .select("id, content, created_at, author_id")
+        .select("id, repo_id, commit_id, content, created_at, author_id")
         .eq("repo_id", repoId)
         .order("created_at", { ascending: false })
 
@@ -39,7 +40,7 @@ export default function Comments({ repoId, commitId }: CommentsProps) {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "comments" },
         (payload) => {
-          setComments((prev) => [payload.new, ...prev])
+          setComments((prev) => [payload.new as Comment, ...prev])
         }
       )
       .subscribe()

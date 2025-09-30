@@ -14,7 +14,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -30,7 +30,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
 
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
     })

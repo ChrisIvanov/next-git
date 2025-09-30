@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
+import { RepoPreview } from "@/types/supabase"
 
 export default function HomeClient() {
-  const [repos, setRepos] = useState<any[]>([])
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
+  const [repos, setRepos] = useState<RepoPreview[]>([])
 
   useEffect(() => {
     async function loadRepos() {
@@ -32,11 +33,11 @@ export default function HomeClient() {
         { event: "*", schema: "public", table: "repositories" },
         (payload) => {
           if (payload.eventType === "INSERT") {
-            setRepos((prev) => [payload.new, ...prev])
+            setRepos((prev) => [payload.new as RepoPreview, ...prev])
           }
           if (payload.eventType === "UPDATE") {
             setRepos((prev) =>
-              prev.map((r) => (r.id === payload.new.id ? payload.new : r))
+              prev.map((r) => (r.id === payload.new.id ? payload.new as RepoPreview: r))
             )
           }
           if (payload.eventType === "DELETE") {
