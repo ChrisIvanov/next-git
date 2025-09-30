@@ -18,94 +18,91 @@ export default function CommitDetailsPage() {
   const [content, setContent] = useState("")
   const [error, setError] = useState<string | null>(null)
 
-  
-  async function loadFiles() {
-    console.log("commitId used in query:", commitId)
-  const { data: filesData } = await supabase
-    .from("files")
-    .select("*")
-    .eq("commit_id", commitId)
-    .order("created_at", { ascending: true })
- console.log("filesData:", filesData, "error:", error)
-    setFiles(filesData || [])
-  }
-
+  // зареждане на commit + files
   useEffect(() => {
-  if (!commitId) return
+    if (!commitId) return
 
-  async function loadData() {
-    
-    const { data: commitData } = await supabase
-      .from("commits")
-      .select("id, repo_id, message, created_at, author_id")
-      .eq("id", commitId)
-      .single()
+    async function loadData() {
+      const { data: commitData } = await supabase
+        .from("commits")
+        .select("id, repo_id, message, created_at, author_id")
+        .eq("id", commitId)
+        .single()
 
-    setCommit(commitData)
-    await loadFiles()
-  }
+      setCommit(commitData)
 
-  loadData()
+      const { data: filesData } = await supabase
+        .from("files")
+        .select("*")
+        .eq("commit_id", commitId)
+        .order("created_at", { ascending: true })
 
-  // realtime
-  const channel = supabase
-    .channel("files-realtime")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "files", filter: `commit_id=eq.${commitId}` },
-      (payload) => {
-        if (payload.eventType === "INSERT") {
-          setFiles((prev) => [...prev, payload.new as File])
+      setFiles(filesData || [])
+    }
+
+    loadData()
+
+    // realtime
+    const channel = supabase
+      .channel("files-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "files", filter: `commit_id=eq.${commitId}` },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            setFiles((prev) => [...prev, payload.new as File])
+          }
+          if (payload.eventType === "DELETE") {
+            setFiles((prev) => prev.filter((f) => f.id !== (payload.old as File).id))
+          }
+          if (payload.eventType === "UPDATE") {
+            setFiles((prev) =>
+              prev.map((f) =>
+                f.id === (payload.new as File).id ? (payload.new as File) : f
+              )
+            )
+          }
         }
-        if (payload.eventType === "DELETE") {
-          setFiles((prev) => prev.filter((f) => f.id !== (payload.old as File).id))
-        }
-        if (payload.eventType === "UPDATE") {
-          setFiles((prev) =>
-            prev.map((f) => (f.id === (payload.new as File).id ? (payload.new as File) : f))
-          )
-        }
-      }
-    )
-    .subscribe()
+      )
+      .subscribe()
 
-  return () => {
-    supabase.removeChannel(channel)
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [commitId])
+
+  // добавяне на файл
+  async function handleAddFile(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+
+    if (!filename.trim() || !content.trim()) {
+      setError("Filename and content are required")
+      return
+    }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push("/login")
+      return
+    }
+
+    const { error } = await supabase.from("files").insert([
+      {
+        commit_id: commitId,
+        filename,
+        content,
+      },
+    ])
+
+    if (error) {
+      setError(error.message)
+    } else {
+      setFilename("")
+      setContent("")
+      // не викаме loadFiles(), защото realtime ще хване INSERT-а
+    }
   }
-}, [commitId])
-
-// добавяне на файл
-async function handleAddFile(e: React.FormEvent) {
-  e.preventDefault()
-  setError(null)
-
-  if (!filename.trim() || !content.trim()) {
-    setError("Filename and content are required")
-    return
-  }
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    router.push("/login")
-    return
-  }
-
-  const { error } = await supabase.from("files").insert([
-    {
-      commit_id: commitId,
-      filename,
-      content,
-    },
-  ])
-
-  if (error) {
-    setError(error.message)
-  } else {
-    setFilename("")
-    setContent("")
-    //await loadFiles()
-  }
-}
 
   if (!commit) return <p className="p-4">Loading commit...</p>
 
@@ -167,7 +164,9 @@ async function handleAddFile(e: React.FormEvent) {
         ))}
       </ul>
       {files.length === 0 && (
-      <p className="text-gray-500 mt-2">No files found for this commit</p>)}
+        <p className="text-gray-500 mt-2">No files found for this commit</p>
+      )}
+
       {/* секция за коментари */}
       <Comments repoId={repoId} commitId={commitId} />
     </div>
